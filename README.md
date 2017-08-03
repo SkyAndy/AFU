@@ -1,2 +1,2 @@
 # AFU
-AFU staff
+AFU stuff
