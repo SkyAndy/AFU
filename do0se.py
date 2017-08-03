@@ -24,8 +24,8 @@ sensorfile = '/w1_slave'
 
 lan = False
 
-#chat_id='254108124'
-#bot = telegram.Bot(token='440020180:AAGLGfj9tyxLL_HeGdI53XH0YJWC6JP3Hws')
+#chat_id='xxxxxxxxx'
+#bot = telegram.Bot(token='xxx:xxx')
 
 def erstelle():
     ret = rrdtool.create("do0se.rrd", "--step", "200", "--start", '0',
