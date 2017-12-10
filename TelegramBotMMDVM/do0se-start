@@ -1,0 +1,106 @@
+#!/bin/bash
+### BEGIN INIT INFO
+# Provides:          do0se
+# Required-Start:    $syslog
+# Required-Stop:     $syslog
+# Default-Start:     5
+# Default-Stop:      0 1 6
+# Short-Description: DO0SE MMDVM DMRGW IRCDB RDD TGBOT Starten
+# Description:       This file should be used to construct scripts to be
+#                    placed in /etc/init.d.  This example start a
+#                    single forking daemon capable of writing a pid
+#                    file.  To get other behavoirs, implemend
+#                    do_start(), do_stop() or other functions to
+#                    override the defaults in /lib/init/init-d-script.
+### END INIT INFO
+
+function send_aprs {
+    echo "Sende APRS SMS als Info...."
+    APRS_CALL=DO0SE-B
+    APRS_PASS=17150
+    APRS_SERVER=hun.aprs2.net
+    APRS_PORT=14580
+    TARGET_CALL="DO7EN    " # MUST be 9 character long
+    TIMESTAMP=`date -u +%d%H%M`z
+    SMS="DMR Service gestartet"
+    OBJECT=":${TARGET_CALL}:${SMS}"
+    BTEXT="$APRS_CALL>APN001:${OBJECT}"
+    LOGIN="User $APRS_CALL pass $APRS_PASS"
+    # nc or ncat binary
+    if [ -f /usr/bin/ncat ] ; then
+        NC=/usr/bin/ncat
+    else
+        NC=$BIN/ncat
+    fi
+    echo -e "${LOGIN}\n${BTEXT}" | $NC -w 10 ${APRS_SERVER} ${APRS_PORT} &>/dev/null
+}
+
+case "$1" in
+    start)
+        echo "ok alles neu starten..."
+        killall -9 python
+        killall -9 MMDVMHost
+        killall -9 DMRGateway
+        killall -9 ircddbgatewayd
+        killall -9 YSFGateway
+        #rm -rf /mnt/RAMDisk/MMDV*
+        #rm -rf /mnt/RAMDisk/DMR*
+        #rm -rf /var/log/DMRGateway-*
+        #rm -rf /var/log/opendv/*.log
+   
+        echo "starte RRD neu...."
+        cd /root/DO0SE-Temperatur
+        screen -X -S rrd kill
+        screen -dm -S rrd /usr/bin/python /root/DO0SE-Temperatur/do0se.py 
+    
+        echo "starte ircddbgatewayd neu..."
+        cd /home/opendv
+        screen -X -S IRC kill
+        sleep 3
+        screen -dm -S IRC ircddbgatewayd
+    
+        echo "starte tgbot neu..."
+        cd /root
+        screen -X -S tgbot kill
+        screen -dm -S tgbot /usr/bin/python /root/tgbot_mmdvm_server.py
+
+        echo -e "\033[32mstarte DMRGateway"
+        cd /opt
+        killall -9 MMDVMHost
+        killall -9 DMRGateway
+        killall -9 YSFGateway
+        screen -X -S DMRGW kill
+        screen -X -S MMDVM kill
+        screen -X -S C4FM kill
+        screen -dm -S DMRGW /opt/DMRGateway /opt/DMRGateway.ini
+        #DATE=`date +%Y-%m-%d`
+        sleep 5
+        #Name=`ls -t1 /mnt/RAMDisk/DMRGateway* | head -n1`
+        #echo $Name
+        #while ! tac $Name | head -n1 | grep "Waiting for MMDVM to connect"; do  echo "."; sleep 1; done
+        echo -e "\033[32mstarte MMDVMHost..."
+        screen -dm -S MMDVM /opt/MMDVMHost MMDVMHost.ini
+        sleep 5
+        Name=`ls -t1 /mnt/RAMDisk/MMDVM* | head -n1`
+        echo $Name
+#        while ! tac $Name | head -n1 | grep "DMR, Logged into the master successfully"; do echo "."; sleep 1; done
+        chown -R www-data:www-data /mnt/RAMDisk/MMDV*
+        chown -R www-data:www-data /mnt/RAMDisk/DMR*
+        echo -e "\033[32mstarte YSFGateway..."
+        cd /opt
+        screen -dm -S C4FM /opt/YSFGateway /opt/YSFGateway.ini
+        /opt/aprs.sh
+        screen -list
+        ;;
+    stop)
+        echo -e "\033[41mok stoppe DMR...."
+        killall -9 MMDVMHost
+        killall -9 DMRGateway
+        killall -9 ircddbgatewayd
+        killall -9 YSFGateway
+        ;;
+    status)
+        screen -list
+        ;;
+    *)
+esac
